@@ -22,3 +22,5 @@ coverage/
 /seed-*.mjs
 /promote_*.ts
 /create_notif.ts
+
+!seed-products.mjs
