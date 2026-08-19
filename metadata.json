@@ -1,0 +1,5 @@
+{
+  "name": "Intelligent E-commerce Backend",
+  "description": "A production-ready Node.js + Express backend for an intelligent e-commerce system using PostgreSQL.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,62 @@
+# Render Blueprint — Claire Skiin backend
+#
+# Render runs this as a single web service in Frankfurt (Starter plan),
+# chosen for proximity to the Supabase project in the Paris (eu-west-3) region
+# and to keep an always-on process for Socket.io.
+#
+# The database is Supabase (external). Render does NOT provision or manage it;
+# connect via DATABASE_URL set manually in the Render dashboard.
+
+services:
+  - type: web
+    name: claire-skiin-backend
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      # --- App runtime ---
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: SHARED_APP_URL
+        sync: false
+
+      # --- Auth ---
+      - key: JWT_SECRET
+        sync: false
+
+      # --- Database (Supabase) ---
+      - key: DATABASE_URL
+        sync: false
+
+      # --- Email (SMTP) ---
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_APP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_NAME
+        sync: false
+
+      # --- Fapshi payment provider ---
+      - key: FAPSHI_BASE_URL
+        sync: false
+      - key: FAPSHI_API_USER
+        sync: false
+      - key: FAPSHI_API_KEY
+        sync: false
+      - key: FAPSHI_WEBHOOK_SECRET
+        sync: false
+
+      # --- AI providers ---
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PYTHON_AI_SERVICE_URL
+        sync: false
