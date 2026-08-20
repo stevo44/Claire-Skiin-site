@@ -3,6 +3,43 @@ import pool from '../config/db.ts';
 import logger from '../utils/logger.ts';
 
 /**
+ * Lightweight user-agent parser — extracts device type and browser name
+ * from the User-Agent header using simple substring checks.
+ *
+ * No external dependency (ua-parser-js is not in package.json).  This covers
+ * the major browsers and device classes relevant to analytics; anything
+ * unrecognized falls back to 'unknown' so the metadata is always present.
+ */
+function parseUserAgent(ua: string): { device: string; browser: string } {
+  if (!ua) return { device: 'unknown', browser: 'unknown' };
+
+  // Device class — check mobile/tablet first (more specific)
+  let device = 'desktop';
+  if (/iPad|Tablet|PlayBook|Silk-Accelerated/i.test(ua) &&
+      !/Mobile/i.test(ua)) {
+    device = 'tablet';
+  } else if (/Mobi|Android|iPhone|iPod|Windows Phone|BlackBerry|Opera Mini/i.test(ua)) {
+    device = 'mobile';
+  }
+
+  // Browser — order matters (Edge contains "Chrome", Chrome contains "Safari")
+  let browser = 'unknown';
+  if (/Edg\//i.test(ua)) {
+    browser = 'edge';
+  } else if (/OPR\//i.test(ua) || /Opera Mini/i.test(ua)) {
+    browser = 'opera';
+  } else if (/Chrome\//i.test(ua) && !/Chromium/i.test(ua)) {
+    browser = 'chrome';
+  } else if (/Firefox\//i.test(ua)) {
+    browser = 'firefox';
+  } else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) {
+    browser = 'safari';
+  }
+
+  return { device, browser };
+}
+
+/**
  * @desc Track a user event
  * @route POST /api/events
  * @access Public (Optional Auth)
@@ -16,13 +53,24 @@ export const trackEvent = async (req: any, res: Response) => {
       return res.status(400).json({ message: 'Event type is required' });
     }
 
+    // Enrich metadata with device/browser info parsed from User-Agent.
+    // Only adds the fields if they aren't already present in the client
+    // payload (client takes precedence for any custom overrides).
+    const ua = req.headers['user-agent'] || '';
+    const { device, browser } = parseUserAgent(ua);
+    const enrichedMetadata = {
+      device,
+      browser,
+      ...metadata,
+    };
+
     const query = `
       INSERT INTO events (user_id, session_id, event_type, metadata)
       VALUES ($1, $2, $3, $4)
       RETURNING id, created_at
     `;
 
-    const result = await pool.query(query, [userId, session_id || null, event_type, JSON.stringify(metadata)]);
+    const result = await pool.query(query, [userId, session_id || null, event_type, JSON.stringify(enrichedMetadata)]);
 
     // Return 202 Accepted for high-volume tracking (fire and forget pattern)
     res.status(202).json({

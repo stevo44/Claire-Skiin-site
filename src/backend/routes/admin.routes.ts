@@ -59,6 +59,7 @@ router.get('/analytics/most-purchased',    requirePermission('analytics:view'), 
 router.get('/analytics/conversion-rate',   requirePermission('analytics:view'), adminAnalyticsController.getConversionRate);
 router.get('/analytics/abandonment-rate',  requirePermission('analytics:view'), adminAnalyticsController.getCartAbandonmentRate);
 router.get('/analytics/activity-trends',   requirePermission('analytics:view'), adminAnalyticsController.getUserActivityTrends);
+router.get('/analytics/dashboard',         requirePermission('analytics:view'), adminAnalyticsController.getDashboard);
 
 // ── Products ──────────────────────────────────────────────────────────────
 router.get('/products',        requirePermission('inventory:update'), adminProductController.getProducts);

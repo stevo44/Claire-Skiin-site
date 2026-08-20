@@ -1,6 +1,8 @@
 import Joi from 'joi';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './error.middleware.ts';
+// Shared source-of-truth for password rules — see file header for details.
+import { PASSWORD_MIN_LENGTH, PASSWORD_PATTERN } from '../../lib/passwordRules.ts';
 
 export const validate = (schema: Joi.ObjectSchema) =>
   (req: Request, res: Response, next: NextFunction): void => {
@@ -17,15 +19,16 @@ export const validate = (schema: Joi.ObjectSchema) =>
 export const authSchemas = {
   register: Joi.object({
     email:      Joi.string().email().lowercase().trim().required(),
-    // Stronger password: min 8 chars, at least 1 uppercase, 1 number, 1 special char
+    // Password rules imported from src/lib/passwordRules.ts (single source of truth).
+    // PASSWORD_PATTERN requires: 1 lowercase, 1 uppercase, 1 number, 1 special char.
     password: Joi.string()
-      .min(8)
-      .pattern(/^(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9])/)
+      .min(PASSWORD_MIN_LENGTH)
+      .pattern(PASSWORD_PATTERN)
       .required()
       .messages({
-        'string.min':     'Password must be at least 8 characters.',
+        'string.min':     `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
         'string.pattern.base':
-          'Password must contain at least one uppercase letter, one number, and one special character.',
+          'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
       }),
     full_name:  Joi.string().min(2).max(100).trim().required(),
     avatar_url: Joi.string().uri().optional(),
@@ -43,13 +46,13 @@ export const authSchemas = {
   resetPassword: Joi.object({
     token:    Joi.string().required(),
     password: Joi.string()
-      .min(8)
-      .pattern(/^(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9])/)
+      .min(PASSWORD_MIN_LENGTH)
+      .pattern(PASSWORD_PATTERN)
       .required()
       .messages({
-        'string.min':     'Password must be at least 8 characters.',
+        'string.min':     `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
         'string.pattern.base':
-          'Password must contain at least one uppercase letter, one number, and one special character.',
+          'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
       }),
   }),
 };

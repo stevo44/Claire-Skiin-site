@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSpa } from '../store/spaStore';
 import { showToast } from './ToastContainer';
+import { eventService } from '../services/eventService';
 import {
   getSpaServices,
   createBooking,
@@ -94,6 +95,15 @@ export default function SpaBookingModal({ open, onClose }: Props) {
         notes: form.notes,
       });
       dispatch({ type: 'ADD_BOOKING', payload: booking });
+      // Track successful appointment booking (Phase 3)
+      eventService.trackAppointmentBooking({
+        appointment_id: booking.id,
+        appointment_number: booking.appointmentNumber,
+        service_ids: selectedProcedureIds,
+        total_price: totalPrice,
+        date: selectedDate,
+        time: selectedSlot?.time,
+      });
       showToast(`Booking confirmed for ${formatDate(selectedDate)}! 🌿`, 'event_available');
       handleClose();
     } catch (err: any) {

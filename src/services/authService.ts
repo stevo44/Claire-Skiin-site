@@ -62,9 +62,9 @@ export const authService = {
   },
 
   /**
-   * @desc Update current user profile (whatsapp_number, etc.)
+   * @desc Update current user profile (whatsapp_number, momo_number, etc.)
    */
-  updateProfile: async (data: { full_name?: string; whatsapp_number?: string }) => {
+  updateProfile: async (data: { full_name?: string; whatsapp_number?: string; momo_number?: string }) => {
     const response = await api.put('/auth/profile', data);
     const updatedUser = response.data.data || response.data;
     if (updatedUser) {
@@ -87,5 +87,21 @@ export const authService = {
   getUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+  },
+
+  /**
+   * @desc Request a password reset link (forgot password flow)
+   */
+  forgotPassword: async (email: string) => {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  /**
+   * @desc Reset password using a token from the email link
+   */
+  resetPassword: async (token: string, password: string) => {
+    const response = await api.post('/auth/reset-password', { token, password });
+    return response.data;
   },
 };

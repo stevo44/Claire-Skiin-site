@@ -298,6 +298,8 @@ export const initDatabase = async () => {
     CREATE INDEX IF NOT EXISTS idx_events_session_id ON events(session_id);
     CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
     CREATE INDEX IF NOT EXISTS idx_events_metadata ON events USING gin(metadata);
+    -- Composite index: every analytics query filters by event_type + created_at
+    CREATE INDEX IF NOT EXISTS idx_events_type_created ON events(event_type, created_at);
   `;
 
   const createExtraIndexes = `
@@ -636,6 +638,13 @@ export const initDatabase = async () => {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(50);
   `;
 
+  // Persist the customer's preferred mobile-money number so returning
+  // customers don't have to re-enter it at checkout. Same VARCHAR(50)
+  // pattern as whatsapp_number.
+  const alterUsersForMomoNumber = `
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS momo_number VARCHAR(50);
+  `;
+
   // Seed agencies — real Buea transport operators
   // is_verified = TRUE only for entries independently confirmed in research
   const seedAgencies = `
@@ -769,6 +778,7 @@ export const initDatabase = async () => {
     await pool.query(createAgencyTownCoverageTable);
     await pool.query(alterOrdersForDelivery);
     await pool.query(alterUsersForWhatsApp);
+    await pool.query(alterUsersForMomoNumber);
     await pool.query(seedAgencies);
     await pool.query(seedAgencyTownCoverage);
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authService } from '../services/authService.ts';
+import { eventService } from '../services/eventService';
 
 export const useAuth = () => {
   const [user, setUser] = useState(authService.getUser());
@@ -14,6 +15,8 @@ export const useAuth = () => {
       const data = await authService.login(credentials);
       setUser(data.user);
       setIsAuthenticated(true);
+      // Track successful login (non-blocking, fire-and-forget)
+      if (data.user?.id !== undefined) eventService.trackLogin(data.user.id);
       return data;
     } catch (err: any) {
       setError(err.message || 'Login failed');
@@ -38,9 +41,13 @@ export const useAuth = () => {
   };
 
   const logout = useCallback(() => {
+    // Capture user before clearing state so we can track the logout event
+    const currentUser = authService.getUser();
     authService.logout();
     setUser(null);
     setIsAuthenticated(false);
+    // Track logout (non-blocking, fire-and-forget)
+    if (currentUser?.id !== undefined) eventService.trackLogout(currentUser.id);
   }, []);
 
   const fetchProfile = useCallback(async () => {

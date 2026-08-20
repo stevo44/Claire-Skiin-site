@@ -80,6 +80,12 @@ export default function ShopPage() {
     }
   };
 
+  const handleSearchSubmit = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && search.trim()) {
+      eventService.trackSearch(search.trim(), filtered.length);
+    }
+  };
+
   const resetFilters = () => { setCategory('All'); setPriceMax(PRICE_MAX); setSort('featured'); setSearch(''); };
   const hasActiveFilters = category !== 'All' || priceMax < PRICE_MAX || sort !== 'featured' || search !== '';
 
@@ -109,7 +115,7 @@ export default function ShopPage() {
 
           {/* Mobile search + filter toggle */}
           <div className="flex md:hidden gap-3 mb-6">
-            <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
+            <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleSearchSubmit}
               className="flex-1 pl-4 pr-4 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-sm focus:outline-none focus:border-primary transition-colors" />
             <button onClick={() => setFilterOpen(!filterOpen)}
               className="flex items-center gap-1 px-4 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-semibold">
@@ -123,7 +129,7 @@ export default function ShopPage() {
             <aside className={`w-full lg:w-64 shrink-0 space-y-8 ${filterOpen ? 'block' : 'hidden lg:block'}`}>
               <div className="hidden lg:block relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">search</span>
-                <input type="text" placeholder="Search products…" value={search} onChange={e => setSearch(e.target.value)}
+                <input type="text" placeholder="Search products…" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleSearchSubmit}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-sm focus:outline-none focus:border-primary transition-colors" />
               </div>
 

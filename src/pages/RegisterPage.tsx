@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuthContext } from '../store/authStore';
 import { Link, useNavigate } from 'react-router-dom';
 import { showToast } from '../components/ToastContainer';
+import PasswordChecklist from '../components/PasswordChecklist';
 
 export default function RegisterPage() {
   const { register, loading, error } = useAuthContext();
@@ -11,13 +12,14 @@ export default function RegisterPage() {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [localError, setLocalError] = useState('');
+  const [passwordValid, setPasswordValid] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLocalError('');
-    if (password !== confirmPassword) { setLocalError('Passwords do not match'); return; }
-    if (password.length < 8) { setLocalError('Password must be at least 8 characters'); return; }
+    // The submit button is disabled when passwordValid is false, but we
+    // keep this guard as a safety net in case the button is somehow
+    // triggered without all rules passing.
+    if (!passwordValid) return;
     try {
       await register({
         email,
@@ -32,7 +34,7 @@ export default function RegisterPage() {
     }
   };
 
-  const displayError = localError || error;
+  const displayError = error;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center pt-24 pb-16 px-6 bg-surface">
@@ -91,9 +93,16 @@ export default function RegisterPage() {
               className="w-full bg-transparent border-b border-outline-variant/30 py-2 mt-3 text-on-surface focus:outline-none focus:border-tertiary transition-colors text-sm" />
           </div>
 
+          {/* Reusable real-time password checklist — same component as ResetPasswordPage */}
+          <PasswordChecklist
+            password={password}
+            confirmPassword={confirmPassword}
+            onValidChange={setPasswordValid}
+          />
+
           <div className="pt-4">
-            <button type="submit" disabled={loading}
-              className="w-full py-4 rounded-full bg-gradient-to-br from-primary to-primary-container text-white text-sm font-bold tracking-widest uppercase hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-primary/20 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3">
+            <button type="submit" disabled={loading || !passwordValid}
+              className="w-full py-4 rounded-full bg-gradient-to-br from-primary to-primary-container text-white text-sm font-bold tracking-widest uppercase hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-primary/20 disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3">
               {loading
                 ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating Account...</>
                 : 'Create Account'}

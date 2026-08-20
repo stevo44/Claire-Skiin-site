@@ -24,6 +24,8 @@ const LipCarePage        = lazy(() => import('./pages/LipCarePage'));
 const SpaServicesPage    = lazy(() => import('./pages/SpaServicesPage'));
 const LoginPage          = lazy(() => import('./pages/LoginPage'));
 const RegisterPage       = lazy(() => import('./pages/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage  = lazy(() => import('./pages/ResetPasswordPage'));
 const OrderConfirmedPage = lazy(() => import('./pages/OrderConfirmedPage'));
 const WishlistPage       = lazy(() => import('./pages/WishlistPage'));
 const NotificationsPage  = lazy(() => import('./pages/NotificationsPage'));
@@ -73,7 +75,7 @@ const ScrollToTop = () => {
 const RouteWrapper = () => {
   const location   = useLocation();
   const isAdmin    = location.pathname.startsWith('/admin');
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/forgot-password' || location.pathname === '/reset-password';
 
   usePageTracking();
 
@@ -100,8 +102,10 @@ const RouteWrapper = () => {
           <Route path="/order-confirmed" element={<OrderConfirmedPage />} />
 
           {/* Auth */}
-          <Route path="/login"    element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login"            element={<LoginPage />} />
+          <Route path="/register"         element={<RegisterPage />} />
+          <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+          <Route path="/reset-password"   element={<ResetPasswordPage />} />
 
           {/* Protected admin */}
           <Route path="/admin" element={

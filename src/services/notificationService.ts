@@ -24,7 +24,7 @@ export const notificationService = {
    */
   getNotifications: async (page = 1, limit = 20): Promise<NotificationsResponse> => {
     const response = await api.get('/notifications', { params: { page, limit } });
-    return response.data.data;
+    return response.data?.data ?? { notifications: [], total: 0, page: 1, totalPages: 1 };
   },
 
   /**
@@ -32,7 +32,7 @@ export const notificationService = {
    */
   getUnreadCount: async (): Promise<number> => {
     const response = await api.get('/notifications/unread-count');
-    return response.data.data.count;
+    return response.data?.data?.count ?? 0;
   },
 
   /**
@@ -47,7 +47,7 @@ export const notificationService = {
    */
   markAllAsRead: async (): Promise<number> => {
     const response = await api.put('/notifications/read-all');
-    return response.data.data.count;
+    return response.data?.data?.count ?? 0;
   },
 };
 

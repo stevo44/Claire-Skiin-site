@@ -88,6 +88,8 @@ const ProductDetailPage: React.FC = () => {
         title: reviewForm.title.trim() || undefined,
         body: reviewForm.body.trim(),
       });
+      // Track review submission — product_id and rating only (no body text)
+      eventService.trackReviewSubmission(id, reviewForm.rating);
       showToast('Review submitted — it will appear after moderation.', 'check_circle');
       setShowReviewForm(false);
       setReviewForm({ rating: 5, title: '', body: '' });

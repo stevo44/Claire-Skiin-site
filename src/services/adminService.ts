@@ -84,6 +84,13 @@ export const adminService = {
   getMostViewedProducts: async () => (await api.get('/admin/analytics/most-viewed')).data,
   getConversionRate:     async () => (await api.get('/admin/analytics/conversion-rate')).data,
   getCartAbandonmentRate:async () => (await api.get('/admin/analytics/abandonment-rate')).data,
+  /**
+   * Unified analytics dashboard — single request returns every metric,
+   * chart, list, and table the Analytics page needs.
+   * @param range '7d' | '30d' | '90d'
+   */
+  getAnalyticsDashboard: async (range: string = '30d') =>
+    (await api.get('/admin/analytics/dashboard', { params: { range } })).data,
 
   // ── Products ──────────────────────────────────────────────────────────
   getProducts:   async (params = {}) => (await api.get('/admin/products', { params })).data,

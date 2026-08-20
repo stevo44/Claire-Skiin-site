@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react';
 import { wishlistService, WishlistItem } from '../services/wishlistService';
+import { eventService } from '../services/eventService';
 import { showToast } from '../components/ToastContainer';
 
 export interface Product {
@@ -202,9 +203,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (inList) {
         await wishlistService.removeFromWishlist(productId);
         showToast('Removed from wishlist', 'heart_broken');
+        eventService.trackWishlistAction(productId, 'remove');
       } else {
         await wishlistService.addToWishlist(productId);
         showToast('Added to wishlist', 'favorite');
+        eventService.trackWishlistAction(productId, 'add');
       }
       // Refresh to get full product joining for Wishlist Page
       refreshWishlist();

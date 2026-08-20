@@ -4,6 +4,10 @@ import { useCart } from '../store/cartStore';
 import { showToast } from '../components/ToastContainer';
 import { orderService } from '../services/orderService';
 import { shippingService, ShippingTown, Agency, DEFAULT_TOWNS } from '../services/shippingService';
+import { eventService } from '../services/eventService';
+import { paymentService } from '../services/paymentService';
+import { authService } from '../services/authService';
+import { validateMoMoNumber, formatForFapshi } from '../lib/momoValidation';
 import api from '../services/api';
 
 type PaymentMethod = 'card' | 'mtn' | 'orange' | 'paypal';
@@ -62,6 +66,14 @@ export default function CheckoutPage() {
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv,    setCardCvv]    = useState('');
+
+  // ── MoMo (Mobile Money) payment phone ────────────────────────────────────────
+  // Separate from the shipping phone — pre-filled from it but fully editable.
+  // Tracked with a ref so the sync effect knows when the user has manually
+  // overridden the pre-fill and should stop auto-syncing.
+  const [momoNumber, setMomoNumber] = useState('');
+  const [momoError,  setMomoError]  = useState('');
+  const momoManuallyEdited = useRef(false);
 
   // ── Promo ────────────────────────────────────────────────────────────────────
   const [promoCode,    setPromoCode]    = useState('');
@@ -145,6 +157,26 @@ export default function CheckoutPage() {
     })();
   }, []);
 
+  // ── Load saved momo_number from profile ──────────────────────────────────────
+  // Returning customers shouldn't have to re-enter their MoMo number.
+  useEffect(() => {
+    const user = authService.getUser();
+    if (user?.momo_number) {
+      setMomoNumber(user.momo_number);
+      momoManuallyEdited.current = true; // stop auto-sync with shipping phone
+    }
+  }, []);
+
+  // ── Sync MoMo field with shipping phone (unless manually edited) ─────────────
+  // Pre-fills the payment phone from the shipping contact phone as the user
+  // types, so they don't have to re-enter the same number. Once they
+  // manually edit the MoMo field, the sync stops.
+  useEffect(() => {
+    if (!momoManuallyEdited.current) {
+      setMomoNumber(phone);
+    }
+  }, [phone]);
+
   // ── Select a town from autocomplete/dropdown ────────────────────────────────
   const handleSelectTown = async (town: ShippingTown) => {
     setSelectedTownId(town.id);
@@ -212,12 +244,50 @@ export default function CheckoutPage() {
     if (method === 'agency_shipping' && agencies.length === 0) {
       fetchAgencies(activeTownName);
     }
+    // Track delivery method selection at checkout
+    eventService.trackDeliveryMethodSelected(method,
+      method === 'agency_shipping' && selectedAgencyId ? { agency_id: selectedAgencyId } : {}
+    );
+  };
+
+  // ── MoMo number change — mark as manually edited, validate real-time ────────
+  const handleMomoNumberChange = (value: string) => {
+    momoManuallyEdited.current = true;
+    setMomoNumber(value);
+    if (payment === 'mtn' || payment === 'orange') {
+      const result = validateMoMoNumber(value, payment);
+      setMomoError(result.valid ? '' : (result.message || ''));
+    } else {
+      setMomoError('');
+    }
+  };
+
+  // ── Payment method change — re-validate MoMo number against new provider ─────
+  const handlePaymentMethodChange = (method: PaymentMethod) => {
+    setPayment(method);
+    if (method === 'mtn' || method === 'orange') {
+      const result = validateMoMoNumber(momoNumber, method);
+      setMomoError(result.valid ? '' : (result.message || ''));
+    } else {
+      setMomoError('');
+    }
   };
 
   // ── Filter matching towns for dropdown suggestion ───────────────────────────
   const filteredTowns = availableTowns.filter(t =>
     t.region_name.toLowerCase().includes(townSearch.toLowerCase())
   );
+
+  // ── Track checkout start (fire once on mount when cart has items) ───────────
+  useEffect(() => {
+    if (state.cart.length > 0) {
+      eventService.trackCheckoutStarted({
+        cart_count: state.cart.length,
+        cart_total: cartTotal,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Validation ───────────────────────────────────────────────────────────────
   const validateShipping = (): boolean => {
@@ -278,7 +348,48 @@ export default function CheckoutPage() {
       );
 
       const createdOrder = orderRes.order ?? orderRes;
+      // Track checkout completion (order confirmed)
+      eventService.trackCheckoutCompleted({
+        order_id: createdOrder.id,
+        total: createdOrder.total_amount ?? finalTotal,
+        payment_method: payment,
+        delivery_method: deliveryMethod,
+        item_count: state.cart.length,
+      });
       clearCart();
+
+      // ── Initiate MoMo payment with the DEDICATED phone field ───────────────
+      // This is the critical wiring: the number from the MoMo input field
+      // (not the shipping phone) is what reaches POST /api/payments/initiate,
+      // which in turn sends it to Fapshi's /direct-pay endpoint. The medium
+      // is set explicitly so the backend's prefix-based fallback detection
+      // is never used.
+      if ((payment === 'mtn' || payment === 'orange') && momoNumber) {
+        try {
+          await paymentService.initiatePayment({
+            order_id: createdOrder.id,
+            phone: formatForFapshi(momoNumber),
+            medium: payment === 'mtn' ? 'mobile money' : 'orange money',
+            email,
+          });
+        } catch (payErr: any) {
+          console.error('MoMo payment initiation failed:', payErr);
+          showToast(
+            payErr?.response?.data?.message || 'Order created, but payment initiation failed. Please retry from your orders.',
+            'error', 'error'
+          );
+        }
+
+        // Persist the MoMo number to the user's profile so returning
+        // customers don't have to re-enter it. Fire-and-forget — a
+        // failure here must not block the order confirmation flow.
+        if (authService.isAuthenticated()) {
+          authService.updateProfile({ momo_number: momoNumber }).catch(err => {
+            console.error('Failed to save MoMo number to profile:', err);
+          });
+        }
+      }
+
       showToast('Order placed successfully!', 'check_circle', 'success');
       navigate('/order-confirmed', { state: { order: createdOrder } });
     } catch (err: any) {
@@ -293,6 +404,8 @@ export default function CheckoutPage() {
     if (promoCode.trim().toUpperCase() === 'GLOW15') {
       setPromoApplied(true);
       showToast('Promo code GLOW15 applied — 15% off!', 'local_offer', 'success');
+      // Track successful coupon application at checkout
+      eventService.trackCouponApplied('GLOW15');
     } else {
       showToast('Invalid promo code. Try GLOW15', 'error', 'error');
     }
@@ -750,7 +863,7 @@ export default function CheckoutPage() {
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => setPayment(opt.id)}
+                      onClick={() => handlePaymentMethodChange(opt.id)}
                       className={`w-full text-left p-5 rounded-xl border cursor-pointer transition-all ${payment === opt.id ? 'border-primary bg-surface-container-lowest shadow-[0_4px_16px_rgba(0,108,12,0.1)]' : 'border-outline/15 bg-surface-container-low hover:bg-surface-container-lowest'}`}
                     >
                       <div className="flex items-center justify-between">
@@ -800,6 +913,31 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   )}
+
+                  {(payment === 'mtn' || payment === 'orange') && (
+                    <div className="mt-4 p-6 rounded-xl bg-surface-container-lowest border border-outline/10 space-y-2">
+                      <label className="block text-[10px] uppercase tracking-widest text-on-surface/50 font-semibold">
+                        {payment === 'mtn' ? 'MTN' : 'Orange'} Mobile Money Number *
+                      </label>
+                      <p className="text-[11px] text-on-surface/50 -mt-1">
+                        Pre-filled from your shipping phone — edit if your payment number differs.
+                      </p>
+                      <input
+                        type="tel"
+                        value={momoNumber}
+                        onChange={e => handleMomoNumberChange(e.target.value)}
+                        placeholder="+237 6XX XXX XXX"
+                        className={`w-full bg-transparent outline-none border-b py-3 focus:border-tertiary transition-colors placeholder:text-on-surface/20 ${momoError ? 'border-error' : 'border-outline/30'}`}
+                      />
+                      {momoError && <p className="text-error text-[11px] mt-1">{momoError}</p>}
+                      {payment === 'mtn' && (
+                        <p className="text-[10px] text-on-surface/40 mt-1">Valid MTN prefixes: 67, 68, 650–654</p>
+                      )}
+                      {payment === 'orange' && (
+                        <p className="text-[10px] text-on-surface/40 mt-1">Valid Orange prefixes: 69, 655–659</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-4 mt-12">
@@ -810,8 +948,19 @@ export default function CheckoutPage() {
                     ← Back
                   </button>
                   <button
-                    onClick={() => setStep('review')}
-                    className="flex-1 py-4 bg-gradient-to-br from-primary to-primary-container text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:scale-[1.01] active:scale-[0.99] transition-transform shadow-xl shadow-primary/20"
+                    onClick={() => {
+                      // Validate MoMo number before proceeding to review
+                      if (payment === 'mtn' || payment === 'orange') {
+                        const result = validateMoMoNumber(momoNumber, payment);
+                        if (!result.valid) {
+                          setMomoError(result.message || '');
+                          return;
+                        }
+                      }
+                      setStep('review');
+                    }}
+                    disabled={(payment === 'mtn' || payment === 'orange') && (!momoNumber || !!momoError)}
+                    className="flex-1 py-4 bg-gradient-to-br from-primary to-primary-container text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:scale-[1.01] active:scale-[0.99] transition-transform shadow-xl shadow-primary/20 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
                   >
                     Review Order →
                   </button>
@@ -856,6 +1005,9 @@ export default function CheckoutPage() {
                       <div>
                         <p className="text-[10px] uppercase tracking-widest text-outline font-bold mb-1">Payment Method</p>
                         <p className="font-semibold text-sm">{PAYMENT_OPTIONS.find(p => p.id === payment)?.label}</p>
+                        {(payment === 'mtn' || payment === 'orange') && momoNumber && (
+                          <p className="text-xs text-on-surface-variant mt-1">MoMo: {momoNumber}</p>
+                        )}
                       </div>
                       <button onClick={() => setStep('payment')} className="text-primary text-xs font-bold uppercase tracking-widest hover:opacity-70 transition-opacity">
                         Edit

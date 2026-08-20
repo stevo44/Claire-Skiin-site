@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authService } from '../services/authService';
+import { eventService } from '../services/eventService';
 
 interface User {
   id: string | number;
@@ -66,6 +67,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await authService.login(credentials);
       setUser(data.user);
       setIsAuthenticated(true);
+      // Track successful login (non-blocking, fire-and-forget)
+      if (data.user?.id !== undefined) eventService.trackLogin(data.user.id);
       // Dispatch same-tab auth event so cartStore can sync wishlist immediately
       // (storage events don't fire for same-tab writes)
       window.dispatchEvent(new CustomEvent('cs:authchange', { detail: { loggedIn: true } }));
@@ -93,9 +96,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = useCallback(() => {
+    // Capture user before clearing state so we can track the logout event
+    const currentUser = authService.getUser();
     authService.logout();
     setUser(null);
     setIsAuthenticated(false);
+    // Track logout (non-blocking, fire-and-forget)
+    if (currentUser?.id !== undefined) eventService.trackLogout(currentUser.id);
     // Notify same tab that auth state changed (clear wishlist)
     window.dispatchEvent(new CustomEvent('cs:authchange', { detail: { loggedIn: false } }));
   }, []);

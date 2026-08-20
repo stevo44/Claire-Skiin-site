@@ -234,7 +234,7 @@ export const getProfile = async (
 ): Promise<void> => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.email, u.full_name, u.avatar_url, u.whatsapp_number, r.name as role, u.created_at, (u.email_verified_at IS NOT NULL) as email_verified
+      `SELECT u.id, u.email, u.full_name, u.avatar_url, u.whatsapp_number, u.momo_number, r.name as role, u.created_at, (u.email_verified_at IS NOT NULL) as email_verified
        FROM users u
        LEFT JOIN roles r ON u.role_id = r.id
        WHERE u.id = $1`,
@@ -249,27 +249,28 @@ export const getProfile = async (
   }
 };
 
-// ── Update profile (whatsapp_number etc.) ─────────────────────────────────────────
+// ── Update profile (whatsapp_number, momo_number, etc.) ─────────────────────────────
 export const updateProfile = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { full_name, whatsapp_number } = req.body;
+    const { full_name, whatsapp_number, momo_number } = req.body;
     const updates: string[] = [];
     const values: any[] = [];
     let i = 1;
 
     if (full_name !== undefined)      { updates.push(`full_name = $${i++}`);      values.push(String(full_name).trim()); }
     if (whatsapp_number !== undefined) { updates.push(`whatsapp_number = $${i++}`); values.push(whatsapp_number ? String(whatsapp_number).trim() : null); }
+    if (momo_number !== undefined)     { updates.push(`momo_number = $${i++}`);     values.push(momo_number ? String(momo_number).trim() : null); }
 
     if (updates.length === 0) return next(new AppError('No fields to update.', 400));
 
     values.push(req.user!.id);
     const result = await pool.query(
       `UPDATE users SET ${updates.join(', ')} WHERE id = $${i}
-       RETURNING id, email, full_name, whatsapp_number, avatar_url`,
+       RETURNING id, email, full_name, whatsapp_number, momo_number, avatar_url`,
       values
     );
     sendSuccess(res, result.rows[0], 'Profile updated successfully.');
@@ -416,8 +417,11 @@ export const forgotPassword = async (
       [hashedResetToken, expiry, user.id]
     );
 
-    // Send email
-    const resetUrl = `${process.env.APP_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    // Send email — link points to the FRONTEND reset page, not the backend
+    // API. Uses SHARED_APP_URL (same env var as verifyEmail) so it works
+    // in both dev (localhost:5173) and production (shared domain).
+    const frontendUrl = process.env.SHARED_APP_URL || 'http://localhost:5173';
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
     await sendEmail(
       user.email,
       'Password Reset Request - Claire Skiin',
