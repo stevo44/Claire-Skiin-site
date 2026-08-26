@@ -73,7 +73,7 @@ async function startServer() {
             // (per-element nonces) is a larger change out of scope here.
             styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
             fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-            imgSrc: ["'self'", 'data:', 'blob:','https://lh3.googleusercontent.com','https://images.unsplash.com'],
+            imgSrc: ["'self'", 'data:', 'blob:','https://lh3.googleusercontent.com','https://images.unsplash.com','https://web.facebook.com','https://tinyurl.com', 'https://z-p3-scontent.fdla3-2.fna.fbcdn.net'],
            connectSrc: ["'self'", 'wss:'],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
